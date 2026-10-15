@@ -81,9 +81,19 @@ NAS in `pki/`, accanto al database (`GATEWAY_PKI_DIR` la sposta), con la chiave 
 lui. Con quella firma il proprio certificato, per il nome della macchina, lo stesso con `.local`,
 `localhost`, `127.0.0.1`, l'indirizzo principale e i nomi in `GATEWAY_TLS_NAMES`, e lo rifà
 all'avvio quando i nomi cambiano o mancano meno di 30 giorni alla scadenza. Sulla porta
-`GATEWAY_PORT` serve la stessa interfaccia e le API in HTTP, senza redirect automatico. Il cookie
+`GATEWAY_PORT` serve la stessa interfaccia e le API in HTTP, salvo il redirect HTTPS scelto nelle impostazioni. Il cookie
 di sessione è `Secure` solo sulle connessioni HTTPS. Senza `GATEWAY_TLS_PORT`,
 come in sviluppo, ascolta in HTTP semplice.
+
+`GET /auth/https` returns `{ port, force }` for the signed-in user. `PUT /auth/https` requires
+password confirmation and saves those connection settings in `gateway.connection`, beside the
+database. The gateway binds the new port before replacing the current listener and updates the
+base firewall through the existing `nas-os-firewall.service`. A failed bind or firewall update
+keeps the previous settings. These changes never regenerate the server certificate or CA, and
+do not replace an installed custom certificate. With enforcement enabled, HTTP requests receive
+a temporary redirect preserving their path and query. The physical screen and loopback health
+checks retain their local HTTP access. Update the wizard's base firewall and the launcher helper
+alongside the gateway before enabling a custom port.
 
 Con `GATEWAY_SCREEN_PORT` (8081 nell'unità) il gateway risponde anche in HTTP su quella porta di
 `127.0.0.1`: è il monitor collegato al NAS, che il firewall di base apre solo all'utente del suo

@@ -47,7 +47,10 @@ printf '\n== Service\n'
 if systemctl is-active --quiet "$NAME"; then
   ok "service running"
   answers "/health on port 80" http://127.0.0.1/health
-  answers "/health over HTTPS on port 443" https://127.0.0.1/health
+  port=443
+  if [[ -r ${DATABASE%.db}.connection ]]; then IFS= read -r port <"${DATABASE%.db}.connection"; fi
+  [[ $port =~ ^[1-9][0-9]{0,4}$ ]] && ((port <= 65535)) || exit 1
+  answers "/health over HTTPS on port $port" "https://127.0.0.1:$port/health"
 else
   no "service not running (journalctl -u $NAME)"
 fi

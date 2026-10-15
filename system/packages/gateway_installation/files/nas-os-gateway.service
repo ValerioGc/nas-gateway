@@ -4,8 +4,9 @@
 #
 # It keeps the account the setup wizard created, the open sessions and the devices allowed in with
 # mTLS in a database of its own, gateway.db in its state directory, and the authority of the NAS in
-# pki/ beside it. The browser reaches it over HTTPS on 443, with a certificate that authority
-# signs; port 80 also serves the NAS in HTTP, without an automatic redirect. With mTLS on,
+# pki/ beside it.
+# HTTPS usa la porta 443 predefinita o quella salvata; HTTP può reindirizzare alla porta HTTPS scelta.
+# Con mTLS attivo e senza reindirizzamento,
 # requests without a device certificate are refused, including on port 80, except on the port of
 # the monitor connected to the NAS.
 

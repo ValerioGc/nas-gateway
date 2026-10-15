@@ -3,6 +3,7 @@ use crate::{
     auth::{mtls, throttle::Throttle},
     certificate_controller as certificate,
     confirm::Codes,
+    connection::{self, Connection},
     controller,
     device_controller::{self as devices, Authority},
     entry,
@@ -17,7 +18,12 @@ use axum::{
 };
 use std::sync::Arc;
 
-pub fn routes(sessions: Sessions, config: Arc<Config>, authority: Option<Arc<Pki>>) -> Router {
+pub fn routes(
+    sessions: Sessions,
+    config: Arc<Config>,
+    authority: Option<Arc<Pki>>,
+    connection: Arc<Connection>,
+) -> Router {
     let signed_in = sessions.clone();
     // One count of refused passwords, for the sign-in and for the confirmations alike, and the
     // codes the confirmations give out, redeemed by what goes to the launcher.
@@ -51,6 +57,7 @@ pub fn routes(sessions: Sessions, config: Arc<Config>, authority: Option<Arc<Pki
         )
         .route("/auth/ca.crt", get(devices::ca))
         .route("/auth/certificate", get(certificate::read))
+        .route("/auth/https", get(connection::read).put(connection::save))
         .route("/auth/certificate/names", put(certificate::save_names))
         .route("/auth/certificate/renew", post(certificate::renew))
         .route(
@@ -76,11 +83,16 @@ pub fn routes(sessions: Sessions, config: Arc<Config>, authority: Option<Arc<Pki
         .layer(Extension(config.clone()))
         .layer(Extension(throttle))
         .layer(Extension(codes))
+        .layer(Extension(connection.clone()))
         .fallback(move |request: Request| entry::handle(config, signed_in, redeemed, request))
         // Every request, the fallback included: with mTLS on, only a device certificate lets one in.
         .layer(middleware::from_fn_with_state(
             sessions.clone(),
             mtls::guard,
+        ))
+        .layer(middleware::from_fn_with_state(
+            connection,
+            connection::redirect,
         ))
         .with_state(sessions)
 }

@@ -124,12 +124,26 @@ pub struct TlsListener {
 
 impl TlsListener {
     pub fn new(listener: TcpListener, config: ServerConfig) -> io::Result<Self> {
+        let (_, updates) = mpsc::channel(1);
+        Self::with_updates(listener, config, updates)
+    }
+
+    pub fn with_updates(
+        mut listener: TcpListener,
+        config: ServerConfig,
+        mut updates: mpsc::Receiver<TcpListener>,
+    ) -> io::Result<Self> {
         let local = listener.local_addr()?;
         let acceptor = TlsAcceptor::from(Arc::new(config));
         let (sender, ready) = mpsc::channel(WAITING);
         tokio::spawn(async move {
             loop {
-                let Ok((stream, address)) = listener.accept().await else {
+                let accepted = tokio::select! {
+                    _ = sender.closed() => return,
+                    Some(replacement) = updates.recv() => { listener = replacement; continue; }
+                    accepted = listener.accept() => accepted,
+                };
+                let Ok((stream, address)) = accepted else {
                     // Out of descriptors, most likely: a pause instead of a busy loop.
                     tokio::time::sleep(Duration::from_millis(100)).await;
                     continue;

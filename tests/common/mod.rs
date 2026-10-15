@@ -55,6 +55,7 @@ impl Database {
     }
 
     fn remove(&self) {
+        let _ = std::fs::remove_file(self.0.with_extension("connection"));
         for suffix in ["", "-wal", "-shm"] {
             let _ = std::fs::remove_file(format!("{}{suffix}", self.0.display()));
         }

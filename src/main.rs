@@ -6,12 +6,14 @@
 //! which the launcher reads to offer the update of the gateway.
 //!
 //! With `GATEWAY_TLS_PORT` the NAS is served over HTTPS there, and `GATEWAY_PORT`
-//! serves HTTP too, without redirecting it; without TLS, only plain HTTP on `GATEWAY_PORT`, as a
+//! serves HTTP too, optionally redirecting it; without TLS, only plain HTTP on `GATEWAY_PORT`, as a
 //! development copy runs. `GATEWAY_SCREEN_PORT` adds the port of the monitor connected to the NAS,
 //! on the loopback (`tls::ScreenListener`).
 
 use nas_os_gateway::{
-    account, authority, discovery, first_device, pki,
+    account, authority,
+    connection::Connection,
+    discovery, first_device, pki,
     tls::{self, Peer, ScreenListener, TlsListener},
     Config,
 };
@@ -24,7 +26,7 @@ use tokio::{
     io::{AsyncBufReadExt, BufReader},
     net::TcpListener,
     signal::unix::{signal, SignalKind},
-    sync::watch,
+    sync::{mpsc, watch},
 };
 
 type Failure = Box<dyn std::error::Error + Send + Sync>;
@@ -60,7 +62,8 @@ async fn serve() -> Result<(), Failure> {
         .and_then(|value| value.parse::<IpAddr>().ok())
         .unwrap_or(IpAddr::from([127, 0, 0, 1]));
     let pki = authority(&config)?;
-    let app = nas_os_gateway::app(config.clone(), pki.clone()).await?;
+    let connection = Connection::load(&config, port_of("GATEWAY_TLS_PORT").unwrap_or(443))?;
+    let app = nas_os_gateway::app(config.clone(), pki.clone(), connection.clone()).await?;
 
     let (stop, stopped) = watch::channel(false);
     tokio::spawn(async move {
@@ -93,7 +96,7 @@ async fn serve() -> Result<(), Failure> {
         }
     };
 
-    let Some(tls_port) = port_of("GATEWAY_TLS_PORT") else {
+    let Some(_) = port_of("GATEWAY_TLS_PORT") else {
         let listener = TcpListener::bind((address, port)).await?;
         let discovery = start_discovery(&config, port, false).await;
         println!("gateway listening on http://{address}:{port}");
@@ -107,12 +110,27 @@ async fn serve() -> Result<(), Failure> {
 
     let pki = pki.ok_or("no place for the authority of the NAS")?;
     pki.activate(&pki::automatic_names())?;
-    let secure = TlsListener::new(
+    let tls_port = connection.settings().port;
+    let (sender, updates) = mpsc::channel(1);
+    let secure = TlsListener::with_updates(
         TcpListener::bind((address, tls_port)).await?,
         tls::server_config(pki.clone())?,
+        updates,
     )?;
+    connection.attach(address, sender).await;
     let plain = TcpListener::bind((address, port)).await?;
-    let discovery = start_discovery(&config, tls_port, true).await;
+    let mut changes = connection.subscribe();
+    let discovery_config = config.clone();
+    let discovery = tokio::spawn(async move {
+        let port = changes.borrow().port;
+        let mut responder = start_discovery(&discovery_config, port, true).await;
+        while changes.changed().await.is_ok() {
+            discovery::stop(responder).await;
+            let port = changes.borrow().port;
+            responder = start_discovery(&discovery_config, port, true).await;
+        }
+        discovery::stop(responder).await;
+    });
     let names = pki.active().map(|(info, _)| info.names).unwrap_or_default();
     println!(
         "gateway listening on https://{address}:{tls_port} for {}, and on http://{address}:{port}",
@@ -138,7 +156,7 @@ async fn serve() -> Result<(), Failure> {
     let http = axum::serve(plain, app.into_make_service_with_connect_info::<Peer>())
         .with_graceful_shutdown(until(stopped));
     let result = tokio::try_join!(async { https.await }, async { http.await }, on_screen);
-    discovery::stop(discovery).await;
+    discovery.abort();
     result?;
     Ok(())
 }

@@ -13,6 +13,7 @@ mod auth {
 pub mod base64;
 mod certificate_controller;
 mod confirm;
+pub mod connection;
 mod controller;
 mod device_controller;
 pub mod discovery;
@@ -103,6 +104,7 @@ pub fn authority(config: &Config) -> Result<Option<Arc<pki::Pki>>, Failure> {
 pub async fn app(
     config: Config,
     authority: Option<Arc<pki::Pki>>,
+    connection: Arc<connection::Connection>,
 ) -> Result<axum::Router, Failure> {
     let Some(target) = config.database.as_deref().and_then(store::copy_target) else {
         return Err(
@@ -111,13 +113,24 @@ pub async fn app(
     };
     let db = store::open(config.database.as_deref()).await?;
     tokio::spawn(store::keep_copy(db.clone(), target));
-    Ok(router::routes(Sessions(db), Arc::new(config), authority))
+    Ok(router::routes(
+        Sessions(db),
+        Arc::new(config),
+        authority,
+        connection,
+    ))
 }
 
 pub async fn app_with(config: Config) -> Result<axum::Router, Failure> {
+    let connection = connection::Connection::load(&config, 443)?;
     let authority = authority(&config)?;
     let db = store::open(config.database.as_deref()).await?;
-    Ok(router::routes(Sessions(db), Arc::new(config), authority))
+    Ok(router::routes(
+        Sessions(db),
+        Arc::new(config),
+        authority,
+        connection,
+    ))
 }
 
 /// Used only when optional LAN discovery is enabled, after the web listener binds.

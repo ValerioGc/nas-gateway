@@ -80,6 +80,45 @@ async fn confirmation(app: &Router, cookie: &str) -> String {
     first(&answer, "code")
 }
 
+#[tokio::test]
+async fn https_settings_require_a_session_and_a_confirmed_password() {
+    let (app, _database) = gateway().await;
+    assert_eq!(
+        send(&app, request("GET", "/auth/https", "", None, ""))
+            .await
+            .0,
+        StatusCode::UNAUTHORIZED
+    );
+    let cookie = sign_in(&app).await;
+    let (status, state) = send(&app, request("GET", "/auth/https", &cookie, None, "")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(state, r#"{"port":443,"force":false}"#);
+    let body = r#"{"port":8443,"force":true}"#;
+    assert_eq!(
+        send(&app, request("PUT", "/auth/https", &cookie, None, body))
+            .await
+            .0,
+        StatusCode::FORBIDDEN
+    );
+    let code = confirmation(&app, &cookie).await;
+    // La copia di test non ha un listener HTTPS: la richiesta autenticata fallisce senza alterare lo stato.
+    assert_eq!(
+        send(
+            &app,
+            request("PUT", "/auth/https", &cookie, Some(&code), body)
+        )
+        .await
+        .0,
+        StatusCode::SERVICE_UNAVAILABLE
+    );
+    assert_eq!(
+        send(&app, request("GET", "/auth/https", &cookie, None, ""))
+            .await
+            .1,
+        state
+    );
+}
+
 /// A certificate of someone else's authority for `name`, and its key, in PEM.
 fn foreign(name: &str) -> (String, String) {
     let key = KeyPair::generate().unwrap();
