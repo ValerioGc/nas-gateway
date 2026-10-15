@@ -11,6 +11,7 @@
 set -euo pipefail
 
 readonly NAME=nas-os-gateway
+readonly RESTORE=${NAS_CONFIGURATION_HELPER:-/usr/local/lib/nas-wizard/packages/os_configuration/scripts/uninstall.sh}
 purge=false
 case ${1:-} in
   --purge) purge=true ;;
@@ -26,10 +27,17 @@ fail() {
 
 [[ $EUID -eq 0 ]] || fail "it has to run as root: sudo $0 ${1:-}"
 
+stop_unit() {
+  local unit=$1 load
+  shift
+  load=$(systemctl show "$unit" --property=LoadState --value)
+  if [[ $load != not-found ]]; then systemctl "$@" "$unit"; fi
+}
+
 say "Service"
 # Read the entire listing: grep -q can close the pipe early and make pipefail skip the stop.
 if systemctl list-unit-files --no-pager --no-legend | grep "^$NAME\.service[[:space:]]" >/dev/null; then
-  systemctl disable --now "$NAME" >/dev/null 2>&1 || true
+  systemctl disable --now "$NAME"
   rm -f "/etc/systemd/system/$NAME.service"
   systemctl daemon-reload
   echo "   stopped, disabled and unit removed"
@@ -38,13 +46,19 @@ else
 fi
 
 say "Password of the shared folders"
-systemctl disable --now nas-os-share-password.socket >/dev/null 2>&1 || true
+stop_unit nas-os-share-password.socket disable --now
+rm -f /run/nas-os-share-password.sock
+listing=$(systemctl list-units --all --plain --no-legend 'nas-os-share-password@*.service')
+mapfile -t instances < <(printf '%s\n' "$listing" | awk 'NF { print $1 }')
+if ((${#instances[@]} > 0)); then systemctl stop "${instances[@]}"; fi
 rm -f /etc/systemd/system/nas-os-share-password.socket \
   '/etc/systemd/system/nas-os-share-password@.service'
 systemctl daemon-reload
 # The group goes with the gateway that was its one member.
 if getent group nas-os-share-password >/dev/null; then
-  groupdel nas-os-share-password || true
+  [[ -x $RESTORE ]] || fail 'the system restoration helper is missing'
+  existed=$("$RESTORE" --group-existed nas-os-share-password)
+  if [[ $existed == no ]]; then groupdel nas-os-share-password; fi
 fi
 echo "   socket, unit and group removed"
 

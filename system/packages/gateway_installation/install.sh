@@ -70,6 +70,10 @@ fi
 command -v systemctl >/dev/null || fail "systemd is not available on this machine"
 $dry_run && printf '\nDry run: no change will be applied.\n'
 
+# La rimozione resta disponibile anche se l'installazione si interrompe a metà.
+run install -d -m 0755 -o root -g root "$TOOLS_DIR"
+run install -m 0755 -o root -g root "$here/scripts/uninstall.sh" "$TOOLS_DIR/uninstall.sh"
+
 say "Copy of the database"
 was_active=false
 if [[ -f $STATE_DIR/gateway.db ]]; then
@@ -88,9 +92,7 @@ run install -m 0755 -o root -g root "$binary_source" "$BINARY_TARGET"
 echo "   $binary_source -> $BINARY_TARGET"
 
 say "Tools on the machine"
-run install -d -m 0755 -o root -g root "$TOOLS_DIR"
 run install -m 0755 -o root -g root "$here/scripts/check.sh" "$TOOLS_DIR/check.sh"
-run install -m 0755 -o root -g root "$here/scripts/uninstall.sh" "$TOOLS_DIR/uninstall.sh"
 run install -m 0755 -o root -g root "$here/scripts/share-password.sh" "$TOOLS_DIR/share-password.sh"
 echo "   $TOOLS_DIR/check.sh, uninstall.sh and share-password.sh"
 
