@@ -66,7 +66,7 @@ impl Connection {
             current,
             path,
             runtime: Mutex::new(None),
-            // Il servizio installato usa StateDirectory; lo sviluppo non modifica il firewall dell'host.
+            // The installed service has StateDirectory; development never touches the host firewall.
             firewall: std::env::var_os("STATE_DIRECTORY").is_some(),
             enabled: config.tls,
         }))
@@ -106,8 +106,8 @@ impl Connection {
             return Ok(());
         }
         let apply = async {
-            // Il primo avvio può unirsi a un job che aveva già letto la vecchia porta.
-            // Il secondo esegue l'helper dopo il completamento di quel job.
+            // The first start may join a job that already read the old port;
+            // the second runs the helper after that job has finished.
             for _ in 0..2 {
                 let result = Command::new("/usr/bin/systemctl")
                     .args(["start", "nas-os-firewall.service"])

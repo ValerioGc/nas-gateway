@@ -17,6 +17,7 @@ src/
   pki.rs             # La CA del NAS, il certificato in uso (cambia senza riavvio) e dei dispositivi
   tls.rs             # L'ascolto HTTPS e l'impronta del certificato client di ogni connessione
   device_controller.rs # Le rotte dell'mTLS e dei dispositivi
+  client_controller.rs # I computer di NAS Sync: certificato, rotte /client/sync e revoche
   first_device.rs    # Il comando locale di amministrazione dei dispositivi
   base64.rs          # Base64 per PEM e .p12 nel JSON
   proxy.rs           # Il proxy verso il launcher, scritto a mano su hyper, WebSocket compresi

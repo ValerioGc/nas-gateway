@@ -124,7 +124,7 @@ async fn changes_the_real_tls_listener_and_persists_without_changing_certificate
     assert_eq!(pki.active().unwrap().0.fingerprint, original);
     assert_eq!(pki.ca_pem(), ca);
 
-    // Un errore di persistenza non chiude la porta in funzione e non cambia lo stato.
+    // A failed save keeps the running port open and the state unchanged.
     std::fs::create_dir(
         connection
             .path

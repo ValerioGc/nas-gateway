@@ -1,7 +1,7 @@
 use crate::{
     account_controller as account,
     auth::{mtls, throttle::Throttle},
-    certificate_controller as certificate,
+    certificate_controller as certificate, client_controller as clients,
     confirm::Codes,
     connection::{self, Connection},
     controller,
@@ -13,7 +13,7 @@ use crate::{
 use axum::{
     extract::{DefaultBodyLimit, Request},
     middleware,
-    routing::{get, post, put},
+    routing::{any, get, post, put},
     Extension, Router,
 };
 use std::sync::Arc;
@@ -78,6 +78,8 @@ pub fn routes(
         )
         .route("/auth/devices/{id}/renew", post(devices::renew))
         .route("/auth/devices/{id}/revoke", post(devices::revoke))
+        .route("/auth/clients", post(clients::create))
+        .route("/client/sync/{*rest}", any(clients::forward))
         .layer(DefaultBodyLimit::max(1024))
         .layer(Extension(Authority(authority)))
         .layer(Extension(config.clone()))

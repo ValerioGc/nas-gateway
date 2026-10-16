@@ -12,6 +12,7 @@ mod auth {
 }
 pub mod base64;
 mod certificate_controller;
+mod client_controller;
 mod confirm;
 pub mod connection;
 mod controller;
@@ -113,6 +114,10 @@ pub async fn app(
     };
     let db = store::open(config.database.as_deref()).await?;
     tokio::spawn(store::keep_copy(db.clone(), target));
+    tokio::spawn(client_controller::keep_revoking(
+        db.clone(),
+        config.launcher.clone(),
+    ));
     Ok(router::routes(
         Sessions(db),
         Arc::new(config),

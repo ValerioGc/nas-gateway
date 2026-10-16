@@ -52,10 +52,15 @@ pub struct DeviceInput {
 impl DeviceInput {
     /// The name, trimmed, when it is one.
     pub fn name(&self) -> Option<&str> {
-        let name = self.name.trim();
-        ((1..=60).contains(&name.chars().count()) && !name.chars().any(char::is_control))
-            .then_some(name)
+        valid_name(&self.name)
     }
+}
+
+/// A name of a device, trimmed, when it is one.
+pub fn valid_name(name: &str) -> Option<&str> {
+    let name = name.trim();
+    ((1..=60).contains(&name.chars().count()) && !name.chars().any(char::is_control))
+        .then_some(name)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -98,6 +103,8 @@ pub struct Device {
     pub certificate: Option<Certificate>,
     /// The device of the connection that asked.
     pub current: bool,
+    /// A computer of the sync client.
+    pub sync: bool,
 }
 
 /// What lets a connection in: its certificate is the device's, not revoked and not expired.
@@ -119,6 +126,7 @@ type Row = (
     Option<i64>,
     Option<i64>,
     Option<i64>,
+    Option<String>,
 );
 
 fn device(row: Row, current: Option<&str>) -> Device {
@@ -133,6 +141,7 @@ fn device(row: Row, current: Option<&str>) -> Device {
         expires_at,
         activated_at,
         seen_at,
+        sync_id,
     ) = row;
     let certificate = fingerprint.map(|fingerprint| Certificate {
         state: CertificateState::parse(state.as_deref().unwrap_or_default()),
@@ -152,6 +161,7 @@ fn device(row: Row, current: Option<&str>) -> Device {
         icon: Icon::parse(&icon),
         created_at,
         certificate,
+        sync: sync_id.is_some(),
     }
 }
 
@@ -160,7 +170,7 @@ macro_rules! select_devices {
     ($tail:literal) => {
         concat!(
             "SELECT d.id, d.name, d.icon, d.created_at, c.fingerprint, c.state,
-                c.issued_at, c.expires_at, c.activated_at, c.seen_at
+                c.issued_at, c.expires_at, c.activated_at, c.seen_at, d.sync_id
              FROM devices d
              LEFT JOIN device_certificates c ON c.fingerprint = (
                  SELECT fingerprint FROM device_certificates
@@ -229,6 +239,38 @@ pub async fn create(
     find(db, id, None).await?.ok_or(sqlx::Error::RowNotFound)
 }
 
+/// A computer of the sync client with its first certificate, pending until it pairs. Another
+/// device with the same engine is that computer paired before: it goes, and its engine stays
+/// paired on the NAS.
+pub async fn create_client(
+    db: &SqlitePool,
+    name: &str,
+    sync_id: &str,
+    credential: &DeviceCredential,
+) -> Result<Device, sqlx::Error> {
+    let mut transaction = db.begin().await?;
+    sqlx::query("DELETE FROM devices WHERE sync_id = ?")
+        .bind(sync_id)
+        .execute(&mut *transaction)
+        .await?;
+    sqlx::query("DELETE FROM sync_revocations WHERE sync_id = ?")
+        .bind(sync_id)
+        .execute(&mut *transaction)
+        .await?;
+    let id: i64 = sqlx::query_scalar(
+        "INSERT INTO devices (name, icon, created_at, sync_id) VALUES (?, 'desktop', ?, ?)
+         RETURNING id",
+    )
+    .bind(name)
+    .bind(now_ms())
+    .bind(sync_id)
+    .fetch_one(&mut *transaction)
+    .await?;
+    insert_certificate(&mut *transaction, id, credential).await?;
+    transaction.commit().await?;
+    find(db, id, None).await?.ok_or(sqlx::Error::RowNotFound)
+}
+
 /// A new name and icon. False when there is no such device.
 pub async fn update(db: &SqlitePool, id: i64, name: &str, icon: Icon) -> Result<bool, sqlx::Error> {
     let changed = sqlx::query("UPDATE devices SET name = ?, icon = ? WHERE id = ?")
@@ -280,21 +322,87 @@ pub async fn renew(
     Ok(true)
 }
 
+/// The engine of a computer of the sync client, kept to be dropped by the sync application.
+async fn queue_revocation<'e>(
+    executor: impl sqlx::SqliteExecutor<'e>,
+    id: i64,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "INSERT INTO sync_revocations (sync_id, since)
+         SELECT sync_id, ? FROM devices WHERE id = ? AND sync_id IS NOT NULL
+         ON CONFLICT (sync_id) DO NOTHING",
+    )
+    .bind(now_ms())
+    .bind(id)
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
 /// Every certificate of the device revoked: it stays in the list, and no longer gets in.
 pub async fn revoke(db: &SqlitePool, id: i64) -> Result<bool, sqlx::Error> {
     if !exists(db, id).await? {
         return Ok(false);
     }
-    revoke_all(db, id).await?;
+    let mut transaction = db.begin().await?;
+    revoke_all(&mut *transaction, id).await?;
+    queue_revocation(&mut *transaction, id).await?;
+    transaction.commit().await?;
     Ok(true)
 }
 
 pub async fn remove(db: &SqlitePool, id: i64) -> Result<bool, sqlx::Error> {
+    let mut transaction = db.begin().await?;
+    queue_revocation(&mut *transaction, id).await?;
     let removed = sqlx::query("DELETE FROM devices WHERE id = ?")
         .bind(id)
+        .execute(&mut *transaction)
+        .await?;
+    transaction.commit().await?;
+    Ok(removed.rows_affected() > 0)
+}
+
+/// The engines of revoked computers still to drop.
+pub async fn pending_revocations(db: &SqlitePool) -> Result<Vec<String>, sqlx::Error> {
+    sqlx::query_scalar("SELECT sync_id FROM sync_revocations ORDER BY since")
+        .fetch_all(db)
+        .await
+}
+
+/// The sync application dropped the engine of a revoked computer.
+pub async fn revocation_done(db: &SqlitePool, sync_id: &str) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM sync_revocations WHERE sync_id = ?")
+        .bind(sync_id)
         .execute(db)
         .await?;
-    Ok(removed.rows_affected() > 0)
+    Ok(())
+}
+
+/// What a computer of the sync client is let in as: its engine, and whether its certificate was
+/// never used (only then may it pair).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Client {
+    pub sync_id: String,
+    pub state: CertificateState,
+}
+
+/// The computer of the sync client a certificate lets in, when it does.
+pub async fn client(db: &SqlitePool, fingerprint: &str) -> Option<Client> {
+    let row: Option<(String, String)> = sqlx::query_as(
+        "SELECT d.sync_id, c.state FROM device_certificates c JOIN devices d ON d.id = c.device_id
+         WHERE c.fingerprint = ? AND c.state <> 'revoked' AND c.expires_at > ?
+           AND d.sync_id IS NOT NULL",
+    )
+    .bind(fingerprint)
+    .bind(now_ms())
+    .fetch_optional(db)
+    .await
+    .ok()
+    .flatten();
+    row.map(|(sync_id, state)| Client {
+        sync_id,
+        state: CertificateState::parse(&state),
+    })
 }
 
 /// The device a certificate lets in, when it does.

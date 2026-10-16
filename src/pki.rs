@@ -245,8 +245,25 @@ pub struct DeviceCredential {
     pub fingerprint: String,
     pub p12: Vec<u8>,
     pub password: String,
+    /// The same certificate and key in PEM, for a client that keeps them itself.
+    pub certificate_pem: String,
+    pub key_pem: String,
     pub issued_at: i64,
     pub expires_at: i64,
+}
+
+/// A certificate in DER as PEM, in lines of 64 characters.
+pub fn certificate_pem(der: &[u8]) -> String {
+    let encoded = crate::base64::encode(der);
+    let lines: Vec<&str> = encoded
+        .as_bytes()
+        .chunks(64)
+        .filter_map(|line| std::str::from_utf8(line).ok())
+        .collect();
+    format!(
+        "-----BEGIN CERTIFICATE-----\n{}\n-----END CERTIFICATE-----\n",
+        lines.join("\n")
+    )
 }
 
 /// The certificate and key the gateway answers HTTPS with, in DER.
@@ -606,6 +623,8 @@ impl Pki {
             fingerprint,
             p12,
             password,
+            certificate_pem: certificate_pem(&issued),
+            key_pem: pair.serialize_pem(),
             issued_at: now_seconds(),
             expires_at,
         })

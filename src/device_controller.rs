@@ -6,11 +6,11 @@
 
 use crate::{
     auth::{devices, mtls},
-    base64,
+    base64, client_controller,
     confirm::{self, Refused},
     controller::signed_in,
     pki::{DeviceCredential, Pki},
-    Sessions,
+    Config, Sessions,
 };
 use axum::{
     extract::{Path, Request, State},
@@ -26,9 +26,10 @@ use std::sync::Arc;
 #[derive(Clone, Default)]
 pub struct Authority(pub Option<Arc<Pki>>);
 
-type Answer = Result<Response, Refused>;
+pub(crate) type Answer = Result<Response, Refused>;
 
-const UNAVAILABLE: Refused = Refused(StatusCode::SERVICE_UNAVAILABLE, "devices are unavailable");
+pub(crate) const UNAVAILABLE: Refused =
+    Refused(StatusCode::SERVICE_UNAVAILABLE, "devices are unavailable");
 const INVALID: Refused = Refused(StatusCode::BAD_REQUEST, "invalid request");
 const NOT_FOUND: Refused = Refused(StatusCode::NOT_FOUND, "no such device");
 const OWN_DEVICE: Refused = Refused(
@@ -39,7 +40,7 @@ const OWN_DEVICE: Refused = Refused(
 /// What a handler needs of a request before it reads the body: the headers and the fingerprint
 /// of the device certificate of the connection. Taken apart first, since the body cannot be held
 /// across a wait.
-fn parts(request: &Request) -> (HeaderMap, Option<String>) {
+pub(crate) fn parts(request: &Request) -> (HeaderMap, Option<String>) {
     (request.headers().clone(), mtls::certificate(request))
 }
 
@@ -51,7 +52,7 @@ async fn caller(sessions: &Sessions, headers: &HeaderMap) -> Result<String, Refu
 }
 
 /// The signed-in user, who also confirmed the password for this one request.
-async fn confirmed(
+pub(crate) async fn confirmed(
     sessions: &Sessions,
     codes: &confirm::Codes,
     headers: &HeaderMap,
@@ -63,7 +64,7 @@ async fn confirmed(
     Ok(user)
 }
 
-async fn json<T: serde::de::DeserializeOwned>(request: Request) -> Result<T, Refused> {
+pub(crate) async fn json<T: serde::de::DeserializeOwned>(request: Request) -> Result<T, Refused> {
     let bytes = axum::body::to_bytes(request.into_body(), 4096)
         .await
         .map_err(|_| INVALID)?;
@@ -238,7 +239,7 @@ fn issued(device: devices::Device, credential: DeviceCredential) -> Issued {
 
 /// A certificate for `name`, made apart from the server's threads: key, signature and the
 /// encryption of the file take their time.
-async fn issue(authority: Authority, name: String) -> Result<DeviceCredential, Refused> {
+pub(crate) async fn issue(authority: Authority, name: String) -> Result<DeviceCredential, Refused> {
     let pki = authority.0.ok_or(UNAVAILABLE)?;
     tokio::task::spawn_blocking(move || pki.issue_device(&name))
         .await
@@ -339,8 +340,15 @@ pub async fn renew(
         .into_response())
 }
 
+/// Drops at once the engine of a revoked computer of the sync client from the sync application.
+fn revoke_sync(sessions: &Sessions, config: &Config) {
+    let (db, launcher) = (sessions.0.clone(), config.launcher.clone());
+    tokio::spawn(async move { client_controller::revoke_pending(&db, &launcher).await });
+}
+
 pub async fn revoke(
     State(sessions): State<Sessions>,
+    Extension(config): Extension<Arc<Config>>,
     Path(raw): Path<String>,
     request: Request,
 ) -> Answer {
@@ -354,11 +362,13 @@ pub async fn revoke(
     {
         return Err(NOT_FOUND);
     }
+    revoke_sync(&sessions, &config);
     Ok(Json(found(&sessions, id, current.as_deref()).await?).into_response())
 }
 
 pub async fn remove(
     State(sessions): State<Sessions>,
+    Extension(config): Extension<Arc<Config>>,
     Path(raw): Path<String>,
     request: Request,
 ) -> Answer {
@@ -372,5 +382,6 @@ pub async fn remove(
     {
         return Err(NOT_FOUND);
     }
+    revoke_sync(&sessions, &config);
     Ok(StatusCode::NO_CONTENT.into_response())
 }

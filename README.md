@@ -23,39 +23,41 @@ printf 'admin\nlong enough\n' | cargo run -- account create
 
 ## Rotte
 
-| Rotta                              | Risultato                                                                                                                                                               |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /auth/login`                 | Controlla l'account e apre una sessione: il cookie `nas_session`, opaco, HttpOnly, SameSite=Strict. 401, 429 o 502.                                                     |
-| `GET /auth/session`                | `{ authenticated, username }` finché il cookie indica una sessione viva; altrimenti 401.                                                                                |
-| `POST /auth/logout`                | Chiude la sessione e fa scadere il cookie.                                                                                                                              |
-| `GET /auth/policy`                 | Con una sessione, il blocco dopo gli accessi rifiutati: `{ enabled, attempts, lockMinutes }`.                                                                           |
-| `PUT /auth/policy`                 | Con una sessione, lo cambia: tentativi da 1 a 20, minuti da 1 a 1440, altrimenti 400.                                                                                   |
-| `GET /health`                      | Controllo locale di prontezza.                                                                                                                                          |
-| `GET /auth/ca.crt`                 | La CA del NAS, da installare come attendibile. Libera, anche con l'mTLS acceso.                                                                                         |
-| `GET /auth/mtls`                   | Con una sessione: `{ enabled, available, current }`, dove `current` è il dispositivo della connessione.                                                                 |
-| `PUT /auth/mtls`                   | Con la password confermata, accende o spegne l'mTLS. Accenderlo senza un certificato valido sulla connessione è 409.                                                    |
-| `GET /auth/devices`                | Con una sessione, i dispositivi con l'ultimo certificato di ciascuno.                                                                                                   |
-| `POST /auth/devices`               | Con la password confermata, `{ name, icon }`: crea il dispositivo e risponde con il `.p12` (base64) e la sua password.                                                  |
-| `PUT /auth/devices/{id}`           | Cambia nome e icona.                                                                                                                                                    |
-| `POST /auth/devices/{id}/renew`    | Con la password confermata: revoca i certificati del dispositivo e ne emette uno nuovo.                                                                                 |
-| `POST /auth/devices/{id}/revoke`   | Revoca i certificati del dispositivo, che resta in elenco.                                                                                                              |
-| `DELETE /auth/devices/{id}`        | Toglie il dispositivo e i suoi certificati.                                                                                                                             |
-| `GET /auth/account`                | Con una sessione: `{ username, email, recovery }`: `email` è l'indirizzo di recupero verificato o `null`, `recovery` dice se il reset via mail è acceso.                |
-| `PUT /auth/account/username`       | Con la password confermata, `{ username }`: cambia il nome di accesso; le sessioni restano aperte.                                                                      |
-| `PUT /auth/account/password`       | Con la password confermata, `{ password }`: la cambia e chiude le altre sessioni.                                                                                       |
-| `PUT /auth/account/share-password` | Con una sessione, `{ password }`: la password dell'account, verificata come una conferma, va a Samba per le cartelle condivise. 204, 403 se sbagliata, 503 senza Samba. |
-| `POST /auth/account/email`         | Con la password confermata, `{ email }`: manda un codice all'indirizzo. 202, o 502 se la mail non parte.                                                                |
-| `POST /auth/account/email/verify`  | Con una sessione, `{ code }`: il codice giusto rende l'indirizzo quello di recupero, altrimenti 400.                                                                    |
-| `DELETE /auth/account/email`       | Con la password confermata, toglie l'indirizzo di recupero.                                                                                                             |
-| `GET /auth/certificate`            | Con una sessione: il certificato HTTPS in uso (soggetto, firmatario, nomi, validità, impronta), l'autorità, i nomi automatici e quelli aggiunti.                        |
-| `PUT /auth/certificate/names`      | Con la password confermata, `{ names }`: gli indirizzi aggiunti al certificato del NAS (al massimo 20), emesso di nuovo subito.                                         |
-| `POST /auth/certificate/renew`     | Con la password confermata: un nuovo certificato del NAS, con la stessa autorità.                                                                                       |
-| `PUT /auth/certificate/custom`     | Con la password confermata, `{ certificate, key }` in PEM: un certificato portato dall'utente, controllato prima di usarlo.                                             |
-| `DELETE /auth/certificate/custom`  | Con la password confermata: torna al certificato del NAS.                                                                                                               |
-| `PUT /auth/account/recovery`       | Con la password confermata, `{ enabled }`: accende o spegne il reset della password via mail. Spento di predefinito.                                                    |
-| `GET /auth/recovery`               | Libera: `{ enabled }`, se la pagina di accesso offre il reset (reset acceso e indirizzo verificato).                                                                    |
-| `POST /auth/recovery`              | Libera, `{ username }`: con il reset acceso, manda un codice all'indirizzo verificato. Sempre 202, o 429.                                                               |
-| `POST /auth/recovery/reset`        | Libera, `{ username, code, password }`: con il codice giusto cambia la password e chiude ogni sessione; altrimenti 400.                                                 |
+| Rotta                                          | Risultato                                                                                                                                                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /auth/login`                             | Controlla l'account e apre una sessione: il cookie `nas_session`, opaco, HttpOnly, SameSite=Strict. 401, 429 o 502.                                                                               |
+| `GET /auth/session`                            | `{ authenticated, username }` finché il cookie indica una sessione viva; altrimenti 401.                                                                                                          |
+| `POST /auth/logout`                            | Chiude la sessione e fa scadere il cookie.                                                                                                                                                        |
+| `GET /auth/policy`                             | Con una sessione, il blocco dopo gli accessi rifiutati: `{ enabled, attempts, lockMinutes }`.                                                                                                     |
+| `PUT /auth/policy`                             | Con una sessione, lo cambia: tentativi da 1 a 20, minuti da 1 a 1440, altrimenti 400.                                                                                                             |
+| `GET /health`                                  | Controllo locale di prontezza.                                                                                                                                                                    |
+| `GET /auth/ca.crt`                             | La CA del NAS, da installare come attendibile. Libera, anche con l'mTLS acceso.                                                                                                                   |
+| `GET /auth/mtls`                               | Con una sessione: `{ enabled, available, current }`, dove `current` è il dispositivo della connessione.                                                                                           |
+| `PUT /auth/mtls`                               | Con la password confermata, accende o spegne l'mTLS. Accenderlo senza un certificato valido sulla connessione è 409.                                                                              |
+| `GET /auth/devices`                            | Con una sessione, i dispositivi con l'ultimo certificato di ciascuno.                                                                                                                             |
+| `POST /auth/devices`                           | Con la password confermata, `{ name, icon }`: crea il dispositivo e risponde con il `.p12` (base64) e la sua password.                                                                            |
+| `PUT /auth/devices/{id}`                       | Cambia nome e icona.                                                                                                                                                                              |
+| `POST /auth/devices/{id}/renew`                | Con la password confermata: revoca i certificati del dispositivo e ne emette uno nuovo.                                                                                                           |
+| `POST /auth/devices/{id}/revoke`               | Revoca i certificati del dispositivo, che resta in elenco.                                                                                                                                        |
+| `DELETE /auth/devices/{id}`                    | Toglie il dispositivo e i suoi certificati.                                                                                                                                                       |
+| `POST /auth/clients`                           | Con la password confermata, `{ name, syncId }`: crea il computer di un client di sincronizzazione (`syncId` è l'identità del suo Syncthing) e risponde con certificato, chiave e autorità in PEM. |
+| `/client/sync/{pair,folders,syncs,syncs/<id>}` | Solo con il certificato attivo di un client di sincronizzazione: va alle rotte client di `nas-sync-manager`, con il computer in `x-nas-client`. `pair` solo con un certificato mai usato.         |
+| `GET /auth/account`                            | Con una sessione: `{ username, email, recovery }`: `email` è l'indirizzo di recupero verificato o `null`, `recovery` dice se il reset via mail è acceso.                                          |
+| `PUT /auth/account/username`                   | Con la password confermata, `{ username }`: cambia il nome di accesso; le sessioni restano aperte.                                                                                                |
+| `PUT /auth/account/password`                   | Con la password confermata, `{ password }`: la cambia e chiude le altre sessioni.                                                                                                                 |
+| `PUT /auth/account/share-password`             | Con una sessione, `{ password }`: la password dell'account, verificata come una conferma, va a Samba per le cartelle condivise. 204, 403 se sbagliata, 503 senza Samba.                           |
+| `POST /auth/account/email`                     | Con la password confermata, `{ email }`: manda un codice all'indirizzo. 202, o 502 se la mail non parte.                                                                                          |
+| `POST /auth/account/email/verify`              | Con una sessione, `{ code }`: il codice giusto rende l'indirizzo quello di recupero, altrimenti 400.                                                                                              |
+| `DELETE /auth/account/email`                   | Con la password confermata, toglie l'indirizzo di recupero.                                                                                                                                       |
+| `GET /auth/certificate`                        | Con una sessione: il certificato HTTPS in uso (soggetto, firmatario, nomi, validità, impronta), l'autorità, i nomi automatici e quelli aggiunti.                                                  |
+| `PUT /auth/certificate/names`                  | Con la password confermata, `{ names }`: gli indirizzi aggiunti al certificato del NAS (al massimo 20), emesso di nuovo subito.                                                                   |
+| `POST /auth/certificate/renew`                 | Con la password confermata: un nuovo certificato del NAS, con la stessa autorità.                                                                                                                 |
+| `PUT /auth/certificate/custom`                 | Con la password confermata, `{ certificate, key }` in PEM: un certificato portato dall'utente, controllato prima di usarlo.                                                                       |
+| `DELETE /auth/certificate/custom`              | Con la password confermata: torna al certificato del NAS.                                                                                                                                         |
+| `PUT /auth/account/recovery`                   | Con la password confermata, `{ enabled }`: accende o spegne il reset della password via mail. Spento di predefinito.                                                                              |
+| `GET /auth/recovery`                           | Libera: `{ enabled }`, se la pagina di accesso offre il reset (reset acceso e indirizzo verificato).                                                                                              |
+| `POST /auth/recovery`                          | Libera, `{ username }`: con il reset acceso, manda un codice all'indirizzo verificato. Sempre 202, o 429.                                                                                         |
+| `POST /auth/recovery/reset`                    | Libera, `{ username, code, password }`: con il codice giusto cambia la password e chiude ogni sessione; altrimenti 400.                                                                           |
 
 Nessuna rotta crea l'account: lo crea il wizard sulla macchina, prima che il gateway ascolti, con
 `nas-os-gateway account create`. Il comando legge nome e password su due righe dell'input, mai
@@ -109,6 +111,14 @@ Il file di un dispositivo è un PKCS#12 con chiave, certificato e CA, cifrato co
 casuale che si vede una sola volta. Accendere l'mTLS è possibile solo da un dispositivo con un
 certificato valido, e non si revoca il certificato della connessione in uso: così nessuno resta
 chiuso fuori.
+
+Un client di sincronizzazione (NAS Sync) riceve il proprio certificato con `POST /auth/clients`, una
+volta confermata la password, e da lì raggiunge solo `/client/sync/...`: il gateway controlla il
+certificato, toglie ogni `x-nas-client` arrivato da fuori, lo scrive con l'identità del Syncthing
+del computer e avvia `nas-sync-manager` se non risponde. Revocare o togliere quel computer chiede
+all'applicazione di dimenticarne il Syncthing e le sincronizzazioni; finché non conferma, il
+gateway riprova ogni cinque minuti (`sync_revocations`). Con l'mTLS acceso un computer nuovo non
+può chiedere il certificato.
 
 Il wizard usa solo `nas-os-gateway ca`, che scrive la CA per HTTPS, e crea l'account con password.
 I dispositivi e l'attivazione mTLS si gestiscono dal Centro sicurezza dopo l'accesso al NAS:

@@ -101,7 +101,7 @@ async fn https_settings_require_a_session_and_a_confirmed_password() {
         StatusCode::FORBIDDEN
     );
     let code = confirmation(&app, &cookie).await;
-    // La copia di test non ha un listener HTTPS: la richiesta autenticata fallisce senza alterare lo stato.
+    // The test copy has no HTTPS listener: the request fails without changing the state.
     assert_eq!(
         send(
             &app,

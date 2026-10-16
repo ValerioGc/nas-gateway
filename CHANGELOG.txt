@@ -8,4 +8,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+
+- The computers of the desktop client NAS Sync: `POST /auth/clients`, with the password
+  confirmed, issues a certificate in PEM for the identity of their sync engine; `/client/sync/...`
+  reaches the client routes of nas-sync-manager only with that certificate, naming the computer in
+  `x-nas-client` and starting the application when it does not answer; a certificate pairs once.
+  `x-nas-client` is dropped from every other request. Revoking or removing such a computer drops
+  its sync engine from nas-sync-manager, retried every five minutes until it succeeds (migration
+  `0005_sync_clients.sql`). Untested on a machine.
 - First demo release of the nas-gateway.

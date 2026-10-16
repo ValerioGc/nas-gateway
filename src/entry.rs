@@ -29,10 +29,14 @@ pub async fn handle(
     codes: confirm::Codes,
     mut request: Request,
 ) -> Response {
-    // Only the gateway names the user and the confirmation: whatever the browser sent under those
-    // names goes, and the confirmation code never reaches the launcher.
+    // Only the gateway names the user, the confirmation and the computer of the sync client:
+    // whatever the browser sent under those names goes, and the confirmation code never reaches
+    // the launcher.
     request.headers_mut().remove(USER_HEADER);
     request.headers_mut().remove(confirm::HEADER);
+    request
+        .headers_mut()
+        .remove(crate::client_controller::CLIENT_HEADER);
     let code = request.headers_mut().remove(confirm::CODE_HEADER);
     let path = request.uri().path();
     if path == "/apps" || path.starts_with("/apps/") {
