@@ -1,6 +1,6 @@
-use crate::{confirm, controller, proxy, ui, Config, Sessions};
+use crate::{confirm, controller, proxy, tls::Peer, ui, Config, Sessions};
 use axum::{
-    extract::Request,
+    extract::{ConnectInfo, Request},
     http::{HeaderValue, Method, StatusCode},
     response::{IntoResponse, Response},
     Json,
@@ -38,6 +38,7 @@ pub async fn handle(
         .headers_mut()
         .remove(crate::client_controller::CLIENT_HEADER);
     let code = request.headers_mut().remove(confirm::CODE_HEADER);
+    mark_secure(&mut request);
     let path = request.uri().path();
     if path == "/apps" || path.starts_with("/apps/") {
         return application(&config, &sessions, request).await;
@@ -66,6 +67,24 @@ pub async fn handle(
 }
 
 const USER_HEADER: &str = "x-nas-user";
+/// Set on a request that came over an encrypted connection: the launcher asks it before it takes
+/// or gives a password or a key.
+pub(crate) const SECURE_HEADER: &str = "x-nas-secure";
+
+fn mark_secure(request: &mut Request) {
+    // Whether a password may travel: over TLS, or from the monitor of the NAS. Only the gateway
+    // says it, never the browser.
+    request.headers_mut().remove(SECURE_HEADER);
+    let secure = request
+        .extensions()
+        .get::<ConnectInfo<Peer>>()
+        .is_some_and(|ConnectInfo(peer)| peer.encrypted || peer.screen);
+    if secure {
+        request
+            .headers_mut()
+            .insert(SECURE_HEADER, HeaderValue::from_static("1"));
+    }
+}
 
 fn mark(request: &mut Request, user: &str) {
     if let Ok(value) = HeaderValue::from_str(user) {

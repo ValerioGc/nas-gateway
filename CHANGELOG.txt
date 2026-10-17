@@ -7,6 +7,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+
+- `X-NAS-Secure: 1` goes with a request that came over TLS or from the monitor of the NAS, and one
+  sent by the browser is dropped: the launcher asks it before it takes or gives back a password or a
+  key.
+
 ### Added
 
 - The computers of the desktop client NAS Sync: `POST /auth/clients`, with the password

@@ -138,7 +138,9 @@ applicazioni, sotto `/apps/<id>/`, vanno al launcher allo stesso modo, solo con 
 il cookie di sessione.
 
 Il gateway scrive `X-NAS-User` con il nome dell'utente collegato su ciò che inoltra, dopo aver tolto
-qualunque valore mandato dal browser. Il ripristino (`POST /api/system/reset`), l'esportazione
+qualunque valore mandato dal browser. Allo stesso modo scrive `X-NAS-Secure: 1` solo su una
+richiesta arrivata in TLS o dallo schermo del NAS: il launcher la chiede prima di accettare o
+restituire una password o una chiave (cifratura dei dischi, dischi di rete). Il ripristino (`POST /api/system/reset`), l'esportazione
 (`GET /api/system/config`) e l'importazione (`POST /api/system/config`) della configurazione
 chiedono di nuovo la password dell'account. Il browser la manda a `POST /auth/confirm`, che con la
 password giusta risponde con un codice valido per una sola richiesta entro un minuto; la richiesta

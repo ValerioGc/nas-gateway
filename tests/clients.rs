@@ -374,3 +374,50 @@ async fn a_stopped_sync_application_is_started_and_waited_for() {
         vec!["/api/apps/nas-sync-manager/start".to_owned()]
     );
 }
+
+/// A launcher that writes down whether each request reached it as secure.
+async fn secure_launcher() -> (String, Seen) {
+    let seen: Seen = Arc::default();
+    let log = seen.clone();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap().to_string();
+    let echo = Router::new().fallback(move |request: Request<Body>| {
+        let log = log.clone();
+        async move {
+            let secure = request
+                .headers()
+                .get("x-nas-secure")
+                .map(|value| value.to_str().unwrap().to_owned())
+                .unwrap_or_default();
+            log.lock().unwrap().push(secure);
+            (StatusCode::OK, "{}")
+        }
+    });
+    tokio::spawn(async move { axum::serve(listener, echo).await.unwrap() });
+    (address, seen)
+}
+
+#[tokio::test]
+async fn only_the_gateway_says_a_request_came_over_an_encrypted_connection() {
+    let (address, seen) = secure_launcher().await;
+    let (app, _database) = gateway(address).await;
+    let cookie = sign_in(&app).await;
+    let forged = |encrypted: bool, screen: bool| {
+        let mut request = request("GET", "/api/storage/disks", &cookie, None, "");
+        request
+            .headers_mut()
+            .insert("x-nas-secure", "1".parse().unwrap());
+        request.extensions_mut().insert(ConnectInfo(Peer {
+            address: "192.168.1.20:50000".parse().unwrap(),
+            certificate: None,
+            encrypted,
+            screen,
+        }));
+        request
+    };
+    for (encrypted, screen) in [(false, false), (true, false), (false, true)] {
+        let (status, _) = send(&app, forged(encrypted, screen)).await;
+        assert_eq!(status, StatusCode::OK);
+    }
+    assert_eq!(*seen.lock().unwrap(), ["", "1", "1"]);
+}
