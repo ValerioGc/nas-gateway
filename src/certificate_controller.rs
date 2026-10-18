@@ -1,4 +1,4 @@
-//! The certificate HTTPS answers with, from the security center. 
+//! The certificate HTTPS answers with, from the security center.
 //! Every change needs the password again (`x-nas-confirmation`) and takes
 //! effect on the next connection, without a restart.
 

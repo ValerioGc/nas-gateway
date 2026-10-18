@@ -362,7 +362,7 @@ pub async fn remove(
     let id = device_id(&raw)?;
     let (headers, current) = parts(&request);
     caller(&sessions, &headers).await?;
-    
+
     not_own(&sessions, id, current.as_deref()).await?;
     if !devices::remove(&sessions.0, id)
         .await

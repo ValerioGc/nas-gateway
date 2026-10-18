@@ -48,7 +48,7 @@ impl IntoResponse for Refused {
     }
 }
 
-/// The password of `user` once more, counted with the refused sign-ins of the address. 
+/// The password of `user` once more, counted with the refused sign-ins of the address.
 pub(crate) async fn checked(
     sessions: &Sessions,
     throttle: &Throttle,
