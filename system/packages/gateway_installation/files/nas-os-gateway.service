@@ -1,0 +1,61 @@
+# The entry of the NAS from the browser. It serves the interface, signs the user in and forwards
+# the API and the applications to the launcher, which listens on the loopback only. Installed by
+# `system/packages/gateway_installation/install.sh`, which the wizard runs.
+#
+# It keeps the account the setup wizard created, the open sessions and the devices allowed in with
+# mTLS in a database of its own, gateway.db in its state directory, and the authority of the NAS in
+# pki/ beside it.
+# HTTPS uses port 443 or the saved one; HTTP may redirect to the chosen HTTPS port.
+# With mTLS on and no redirect,
+# requests without a device certificate are refused, including on port 80, except on the port of
+# the monitor connected to the NAS.
+
+[Unit]
+Description=nas-os gateway
+Documentation=https://github.com/ValerioGc/nas-gateway
+After=network-online.target nas-os.service
+Wants=network-online.target
+
+[Service]
+Type=exec
+ExecStart=/usr/local/bin/nas-os-gateway
+DynamicUser=yes
+SupplementaryGroups=nas-os-share-password
+Environment=GATEWAY_SHARE_PASSWORD_SOCKET=/run/nas-os-share-password.sock
+StateDirectory=nas-os-gateway
+StateDirectoryMode=0700
+Environment=GATEWAY_ADDRESS=0.0.0.0
+Environment=GATEWAY_PORT=80
+Environment=GATEWAY_TLS_PORT=443
+Environment=GATEWAY_SCREEN_PORT=8081
+Environment=GATEWAY_LAUNCHER=127.0.0.1:3000
+Environment=GATEWAY_UI_DIR=/usr/local/share/nas-os/ui
+Environment=TOKIO_WORKER_THREADS=4 MALLOC_ARENA_MAX=2
+Restart=on-failure
+RestartSec=2
+
+# Ports 80 and 443 are the one privilege it has, and the only capability left.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+
+[Install]
+WantedBy=multi-user.target

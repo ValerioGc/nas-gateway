@@ -1,0 +1,26 @@
+{
+  "name": "nas-os-gateway",
+  "version": "0.9.0",
+  "private": true,
+  "type": "module",
+  "description": "Authentication gateway of the NAS system",
+  "author": {
+    "name": "ValerioGc"
+  },
+  "engines": {
+    "node": "^22.18.0 || >=24.12.0"
+  },
+  "scripts": {
+    "dev": "cargo run",
+    "test": "cargo test && npm run test:scripts",
+    "test:scripts": "node --test 'tests/scripts/*.test.mjs'",
+    "coverage:rust": "node -e \"require('fs').mkdirSync('coverage',{recursive:true})\" && cargo llvm-cov --remap-path-prefix --lcov --output-path coverage/lcov.info",
+    "test:sonar": "npm run coverage:rust && cargo clippy --all-targets --message-format=json > clippy-report.json && podman run --rm --userns=keep-id:uid=1000,gid=1000 --network host -e SONAR_TOKEN -e SONAR_HOST_URL=http://127.0.0.1:9000 -v \"$PWD:/usr/src:Z\" docker.io/sonarsource/sonar-scanner-cli:latest",
+    "release:test": "node scripts/release/prepare_release.mjs",
+    "release:package": "node scripts/release/build_package.mjs",
+    "release:merge": "node scripts/release/merge_release.mjs",
+    "podman:sonar:down": "podman compose -f podman-compose.sonar.yml down",
+    "podman:sonar:logs": "podman compose -f podman-compose.sonar.yml logs -f",
+    "podman:sonar:up": "podman compose -f podman-compose.sonar.yml up -d"
+  }
+}

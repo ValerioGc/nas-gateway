@@ -1,0 +1,28 @@
+# Rust build and analysis output
+/target/
+/coverage/
+/clippy-report.json
+/.scannerwork/
+
+# Generated release artifacts
+/release-assets/
+/release-notes.md
+
+# Development database and certificates
+/data/
+
+# Node tooling
+node_modules/
+/pnpm-lock.yaml
+
+# Local editor and assistant settings
+/.vscode/
+/.idea/
+/CLAUDE.md
+/.claude/
+*.local
+*.sw?
+
+# Logs and operating system metadata
+*.log
+.DS_Store
