@@ -11,7 +11,7 @@ serde = { version = "1", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 sqlx = { version = "0.9", default-features = false, features = ["sqlite", "runtime-tokio", "migrate", "macros"] }
 argon2 = "0.6"
-sha2 = "0.11.0"
+sha2 = "0.11.1"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
 rcgen = { version = "0.14", default-features = false, features = ["ring", "pem", "crypto", "x509-parser"] }
