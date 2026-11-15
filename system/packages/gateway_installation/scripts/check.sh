@@ -35,8 +35,8 @@ printf '\n== Installation\n'
 [[ -x /usr/local/bin/$NAME ]] && ok "binary installed" || no "binary missing from /usr/local/bin"
 [[ -f /etc/systemd/system/$NAME.service ]] && ok "unit installed" || no "unit missing"
 systemctl is-enabled --quiet "$NAME" && ok "enabled at boot" || no "not enabled at boot (systemctl enable $NAME)"
-getent group nas-os-share-password >/dev/null && ok "group of the share password present" || no "group nas-os-share-password missing: the gateway does not start (run install.sh again)"
-systemctl is-enabled --quiet nas-os-share-password.socket && ok "socket of the share password enabled" || no "nas-os-share-password.socket not enabled: the password of the shared folders does not reach Samba"
+getent group nas-os-share-password >/dev/null && ok "group of the share password present" || no "group nas-os-share-password missing, the gateway does not start (run install.sh again)"
+systemctl is-enabled --quiet nas-os-share-password.socket && ok "socket of the share password enabled" || no "nas-os-share-password.socket not enabled, the password of the shared folders does not reach Samba"
 
 printf '\n== Service\n'
 if systemctl is-active --quiet "$NAME"; then
@@ -55,9 +55,9 @@ if [[ $EUID -ne 0 ]]; then
   skip "sudo is needed to look at the database of the gateway"
 elif [[ -f $DATABASE ]]; then
   ok "database present in $(dirname "$DATABASE")"
-  [[ -f $(dirname "$DATABASE")/pki/ca.crt ]] && ok "authority of the NAS present" || no "no authority of the NAS yet: the gateway makes it when it starts"
+  [[ -f $(dirname "$DATABASE")/pki/ca.crt ]] && ok "authority of the NAS present" || no "no authority of the NAS yet, the gateway makes it when it starts"
 else
-  no "no database yet: the wizard creates it with the account (nas-os-gateway account create)"
+  no "no database yet, the wizard creates it with the account (nas-os-gateway account create)"
 fi
 
 printf '\n== Interface\n'
@@ -67,6 +67,6 @@ printf '\n'
 if [[ $problems -eq 0 ]]; then
   printf 'All in order.\n'
 else
-  printf '%d things to fix. Run again: sudo ./install.sh\n' "$problems"
+  printf '%d things to fix. Run sudo ./install.sh again.\n' "$problems"
   exit 1
 fi

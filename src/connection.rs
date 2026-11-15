@@ -7,7 +7,7 @@ use crate::{
 use axum::{
     body::Bytes,
     extract::{ConnectInfo, Request, State},
-    http::{header, uri::Authority, HeaderMap, StatusCode},
+    http::{header, uri::Authority, HeaderMap, HeaderValue, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
     Extension, Json,
@@ -208,7 +208,7 @@ pub(crate) async fn save(
     );
     response
         .headers_mut()
-        .insert(header::CONNECTION, "close".parse().unwrap());
+        .insert(header::CONNECTION, HeaderValue::from_static("close"));
     response
 }
 
@@ -250,14 +250,14 @@ pub async fn redirect(
             .path_and_query()
             .map_or("/", |path| path.as_str())
     );
-    let Ok(location) = target.parse::<axum::http::HeaderValue>() else {
+    let Ok(location) = target.parse::<HeaderValue>() else {
         return StatusCode::BAD_REQUEST.into_response();
     };
     (
         StatusCode::TEMPORARY_REDIRECT,
         [
             (header::LOCATION, location),
-            (header::CACHE_CONTROL, "no-store".parse().unwrap()),
+            (header::CACHE_CONTROL, HeaderValue::from_static("no-store")),
         ],
     )
         .into_response()

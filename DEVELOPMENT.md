@@ -35,6 +35,24 @@ system/packages/gateway_installation/   # Installer, checks, uninstaller, and sy
 scripts/release/     # Local release checks, packaging, publishing, and release notes
 ```
 
+## Certificates and the password of the shares
+
+`pki.rs` keeps everything in one directory of the gateway's state. `ca.key` is readable by the
+gateway only, next to `ca.crt` and the server's `server.key`, `server.crt` and `server.names`, the
+names it was issued for. The server certificate is issued again when the names change or it is
+about to expire, while the authority stays, so browsers that trust it keep trusting the NAS.
+`server.extra` holds the names the user added, and `custom.crt` with `custom.key` a certificate the
+user brought, which takes the place of the NAS's own. The certificate in use lives in memory and
+rustls answers with it (`ResolvesServerCert`), so it changes without a restart.
+
+Samba checks the password of a share against a copy of its own, which only root writes and only
+from the password in clear. The gateway is the one part of the NAS that sees it, at a check of the
+user and at every change. `shares.rs` hands it to `share-password.sh`, started for each connection
+by `nas-os-share-password.socket`, and forgets it. A request is two lines, `set` or `update` and the
+password, and the answer is one line, `ok` or `error` with the reason. `set` makes the copy of the
+user of the shares, `update` changes it only where one was made, so a change of the password never
+adds anything to Samba.
+
 ## Rules
 
 - Keep `cargo fmt` and `cargo clippy --all-targets -- -D warnings` clean.

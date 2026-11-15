@@ -1,14 +1,6 @@
-//! The gateway: with no argument it serves the NAS. `account create` creates the one account, from
-//! the name and the password on two lines of the input, and ends with the status of
-//! [`nas_os_gateway::account::AccountRefused::exit_code`]. `ca` writes the authority of the NAS,
-//! creating it the first time, and `device create --name <name> [--icon <icon>] [--enable-mtls]`
-//! creates a device for local administration (`first_device.rs`). `--version` prints the version,
-//! which the launcher reads to offer the update of the gateway.
-//!
-//! With `GATEWAY_TLS_PORT` the NAS is served over HTTPS there, and `GATEWAY_PORT`
-//! serves HTTP too, optionally redirecting it; without TLS, only plain HTTP on `GATEWAY_PORT`, as a
-//! development copy runs. `GATEWAY_SCREEN_PORT` adds the port of the monitor connected to the NAS,
-//! on the loopback (`tls::ScreenListener`).
+//! The gateway. Without arguments it serves the NAS, `account create` (name and password on two
+//! lines of the input), `ca` and `device create` prepare it, `--version` answers the launcher. The
+//! ports come from `GATEWAY_PORT`, `GATEWAY_TLS_PORT` and `GATEWAY_SCREEN_PORT`, see README.md.
 
 use nas_os_gateway::{
     account, authority,

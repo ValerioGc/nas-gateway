@@ -70,6 +70,7 @@ The installer keeps `/usr/local/bin/nas-os-gateway`,
 ```bash
 sudo /usr/local/lib/nas-os-gateway/uninstall.sh            # Remove the service and binary; keep the account
 sudo /usr/local/lib/nas-os-gateway/uninstall.sh --purge    # Also remove the account and sessions, with confirmation
+sudo /usr/local/lib/nas-os-gateway/uninstall.sh --purge --yes  
 ```
 
 The wizard's package handles full NAS removal and delegates gateway removal to this script.

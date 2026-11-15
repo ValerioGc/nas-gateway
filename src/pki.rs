@@ -1,15 +1,6 @@
-//! The certificate authority of the NAS and what it signs the certificate
-//!
-//! Everything lives in one directory of the gateway's state: `ca.key` (readable by the gateway
-//! only), `ca.crt`, and the server's `server.key`, `server.crt` and `server.names`, the names it was
-//! issued for. The server certificate is issued again when the names change or it is about to
-//! expire.The authority stays, so browsers that trust it keep trusting the NAS. `server.extra`
-//! holds the names the user added (a domain, a forwarded address), and `custom.crt` with
-//! `custom.key` a certificate the user brought, which takes the place of the NAS's own.
-//!
-//! The certificate in use lives in memory and is what rustls answers with (`ResolvesServerCert`):
-//! it changes without a restart of the gateway, when the settings change it or the names of the
-//! machine change.
+//! The certificate authority of the NAS and the server certificate it signs. They live in the state
+//! directory and the certificate in use is served from memory, so a change of names or settings
+//! needs no restart. DEVELOPMENT.md lists the files.
 
 use p12_keystore::{
     Certificate as P12Certificate, KeyStore, KeyStoreEntry, PrivateKey, PrivateKeyChain,

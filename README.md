@@ -136,7 +136,7 @@ as encrypted. The phone appears among the devices in Security Center, where it c
 or removed like other devices (`mobile` column, migration `0006_mobile_clients.sql`).
 
 The wizard only uses `nas-os-gateway ca` to create the HTTPS CA and creates the password account.
-Devices and mTLS activation are managed in Security Center after signing in: create and import
+Devices and mTLS activation are managed in Security Center after signing in. Create and import
 the first certificate, reopen the NAS over HTTPS, then enable mTLS with password confirmation.
 The local administration command
 `nas-os-gateway device create --name <name> [--icon <icon>] [--enable-mtls]` remains available
@@ -176,7 +176,7 @@ otherwise it is rejected.
 Changing the sign-in username only affects the gateway. The Linux terminal user and disk
 folders under `.nas-users/<user>` keep the names created by the wizard. Email codes contain six
 digits, expire after 15 minutes or five attempts, and are stored only as SHA-256 hashes. Recovery
-codes cannot be resent within one minute. The gateway does not send mail itself: it calls the
+codes cannot be resent within one minute. The gateway does not send mail itself. It calls the
 launcher over loopback at `POST /internal/mail/code` with `{ to, purpose, code }` (`verify` or
 `reset`), and the launcher delegates to the Email application (`nas-mail-client`). `/internal/`
 is never forwarded from the browser. Recovery responses are identical whether the account or
@@ -203,7 +203,7 @@ npm run test:scripts
 ## NAS Finder
 
 The gateway responds to NAS Finder requests on UDP 39877 with the hostname, configuration
-status, and web port. The base firewall controls access: the port is open only to the local
+status, and web port. The base firewall controls access, and the port is open only to the local
 network while it belongs to the `nas_discovery` set. The wizard opens it during initial setup
 and closes it when handing control to the gateway. Afterward, the launcher reopens it only
 while Security Center's network discovery option is enabled.

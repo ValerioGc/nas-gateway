@@ -57,7 +57,7 @@ run() {
 }
 
 if ! $dry_run; then
-  [[ $EUID -eq 0 ]] || fail "it has to run as root: sudo $0"
+  [[ $EUID -eq 0 ]] || fail "it has to run as root, with sudo $0"
 fi
 [[ -f $binary_source ]] || fail "binary not found at $binary_source
   build it first:  cargo build --release
@@ -78,7 +78,7 @@ if [[ -f $STATE_DIR/gateway.db ]]; then
   fi
   run bash "$here/scripts/copy-database.sh" "$STATE_DIR"
 else
-  echo "   no database yet: nothing to copy"
+  echo "   no database yet, nothing to copy"
 fi
 
 say "Binary"
@@ -112,7 +112,7 @@ elif $was_active; then
   run systemctl start "$NAME"
   echo "   $NAME started again and enabled at boot, on ports 443 and 80"
 else
-  echo "   $NAME enabled at boot, not started: whoever asked for --no-start starts it"
+  echo "   $NAME enabled at boot, not started, whoever asked for --no-start starts it"
 fi
 
 say "Done"

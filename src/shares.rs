@@ -1,14 +1,6 @@
-//! The password of the folders shared on the local network.
-//!
-//! Samba checks the password of a share against a copy of its own, which only root writes and
-//! which can be made only from the password in clear. The gateway is the one part of the NAS that
-//! sees it, at a check of the user and at every change: it hands it to the helper of root behind
-//! `Config::shares` (`share-password.sh`, started for each connection by
-//! `nas-os-share-password.socket`) and forgets it. The launcher and the applications never see it.
-//!
-//! A request is two lines, `set` or `update` and the password; the answer is one line, `ok` or
-//! `error: <why>`. `set` makes the copy of the user of the shares, `update` changes it only where
-//! one was made, so a change of the password never adds anything to Samba.
+//! The password of the folders shared on the local network. The gateway hands it to the root helper
+//! behind `Config::shares` at every check and change, then forgets it. DEVELOPMENT.md describes the
+//! two-line protocol.
 
 use std::{path::Path, time::Duration};
 use tokio::{

@@ -185,22 +185,46 @@ describe('check.sh', () => {
 });
 
 describe('uninstall.sh', () => {
-  it('stops the gateway even when the unit listing is larger than a pipe buffer', () => {
-    const source = readFileSync(join(INSTALLATION, 'scripts/uninstall.sh'), 'utf8');
-    const service = source.slice(source.indexOf('if systemctl list-unit-files'), source.indexOf('say "Password of the shared folders"'));
+  const source = readFileSync(join(INSTALLATION, 'scripts/uninstall.sh'), 'utf8');
+
+  /** The section that stops the gateway, run with a systemctl that knows the unit or not. */
+  function service(loadState) {
+    const section = source.slice(
+      source.indexOf('load=$(systemctl show "$NAME.service"'),
+      source.indexOf('say "Password of the shared folders"'),
+    );
     const script = join(temp.path, 'service.sh');
-    writeFileSync(script, `set -euo pipefail\nNAME=nas-os-gateway\n${service}`);
-    fakeCommand(temp.path, 'systemctl', `
-if [[ $1 == list-unit-files ]]; then
-  set -e
-  printf 'nas-os-gateway.service enabled\\n'
-  for ((n=0;n<10000;n++)); do printf 'other-%s.service disabled\\n' "$n"; done
-else printf '%s\\n' "$*" >> "${join(temp.path, 'calls')}"; fi`);
+    writeFileSync(script, `set -euo pipefail\nNAME=nas-os-gateway\n${section}`);
+    fakeCommand(temp.path, 'systemctl', `if [[ $1 == show ]]; then echo ${loadState}; else printf '%s\\n' "$*" >> "${join(temp.path, 'calls')}"; fi`);
     fakeCommand(temp.path, 'rm', ':');
-    const result = run(script, { env: { PATH: `${temp.path}:${process.env.PATH}` } });
+    return run(script, { env: { PATH: `${temp.path}:${process.env.PATH}` } });
+  }
+
+  it('stops, disables and removes the unit of the gateway when systemd knows it', () => {
+    const result = service('loaded');
+
     assert.equal(result.code, 0);
     assert.match(result.output, /stopped, disabled and unit removed/);
-    assert.match(readFileSync(join(temp.path, 'calls'), 'utf8'), /disable --now nas-os-gateway/);
+    assert.match(readFileSync(join(temp.path, 'calls'), 'utf8'), /disable --now nas-os-gateway\.service/);
+  });
+
+  it('says the gateway was not installed when systemd does not know its unit', () => {
+    const result = service('not-found');
+
+    assert.equal(result.code, 0);
+    assert.match(result.output, /it was not installed/);
+  });
+
+  it('names the step where a removal stopped, since running it again finishes it', () => {
+    const say = source.slice(source.indexOf('say() {'), source.indexOf('fail() {'));
+    const trap = source.split('\n').find((line) => line.startsWith("trap '"));
+    const script = join(temp.path, 'stopped.sh');
+    writeFileSync(script, `set -euo pipefail\n${say}\nstep=''\n${trap}\nsay "Binary"\nfalse\n`);
+
+    const result = run(script);
+
+    assert.notEqual(result.code, 0);
+    assert.match(result.output, /the removal stopped at "Binary", run it again/);
   });
 
   it('refuses an option it does not know', () => {
@@ -209,7 +233,16 @@ else printf '%s\\n' "$*" >> "${join(temp.path, 'calls')}"; fi`);
     });
 
     assert.equal(code, 2);
-    assert.match(output, /unknown option/);
+    assert.match(output, /unknown option --everything/);
+  });
+
+  it('takes --yes next to --purge in any order, and asks only without it', () => {
+    assert.match(source, /--purge\) purge=true ;;\n\s+--yes\) confirmed=true ;;/);
+    assert.match(source, /for argument in "\$@"; do/);
+    assert.match(
+      source.slice(source.indexOf('if $purge; then')),
+      /if \$confirmed; then\n\s+answer=delete\n\s+else\n\s+read -r -p "   Type 'delete' to confirm: " answer\n\s+fi/,
+    );
   });
 });
 
